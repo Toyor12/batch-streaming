@@ -1,0 +1,21 @@
+order_id,customer_id,product_id,quantity,price,order_date,timestamp,status,category
+1,42,7,2,129.99,2026-01-01,2026-01-01T10:30:00Z,delivered,Electronics
+2,17,3,1,49.99,2026-01-01,2026-01-01T11:15:00Z,delivered,Home & Garden
+3,42,12,3,19.99,2026-01-01,2026-01-01T12:00:00Z,pending,Home & Garden
+4,8,7,1,129.99,2026-01-02,2026-01-02T09:00:00Z,delivered,Electronics
+5,23,5,2,79.99,2026-01-02,2026-01-02T14:30:00Z,delivered,Sports
+6,17,9,1,199.99,2026-01-02,2026-01-02T08:45:00Z,pending,Electronics
+7,42,3,4,49.99,2026-01-02,2026-01-02T16:20:00Z,delivered,Home & Garden
+8,8,12,2,19.99,2026-01-03,2026-01-03T10:00:00Z,pending,Home & Garden
+9,23,7,1,129.99,2026-01-03,2026-01-03T13:30:00Z,delivered,Electronics
+10,17,5,3,79.99,2026-01-03,2026-01-03T11:00:00Z,pending,Sports
+11,42,9,1,199.99,2026-01-04,2026-01-04T09:15:00Z,delivered,Electronics
+12,8,3,2,49.99,2026-01-04,2026-01-04T14:45:00Z,delivered,Home & Garden
+13,23,12,1,19.99,2026-01-04,2026-01-04T16:00:00Z,pending,Home & Garden
+14,17,7,2,129.99,2026-01-05,2026-01-05T10:30:00Z,delivered,Electronics
+15,42,5,1,79.99,2026-01-05,2026-01-05T12:00:00Z,pending,Sports
+16,8,9,3,199.99,2026-01-05,2026-01-05T08:00:00Z,delivered,Electronics
+17,23,3,2,49.99,2026-01-05,2026-01-05T15:30:00Z,delivered,Home & Garden
+18,17,12,4,19.99,2026-01-05,2026-01-05T11:45:00Z,pending,Home & Garden
+19,42,7,1,129.99,2026-01-05,2026-01-05T14:00:00Z,delivered,Electronics
+20,8,5,2,79.99,2026-01-05,2026-01-05T16:30:00Z,pending,Sports
