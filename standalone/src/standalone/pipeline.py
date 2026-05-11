@@ -1,8 +1,9 @@
 """Day 19 -- Batch vs Streaming Architecture Tradeoffs (plain Python).
 
-Demonstrates batch and streaming processing paths for the same dataset,
-a serving layer that merges results, and an architecture recommendation
-function.  Streaming is simulated with file-based events (no Kafka).
+Implements batch and streaming processing paths over the same orders dataset,
+a serving layer that merges results with batch as source of truth, and an
+architecture recommendation function. Streaming is simulated with file-based
+events (no Kafka).
 """
 
 import csv
@@ -22,24 +23,47 @@ LAKE_DIR = Path(__file__).parent / "lake"
 # ---------------------------------------------------------------------------
 
 def _ensure_lake_dirs() -> tuple[Path, Path]:
-    """Create lake/batch/ and lake/streaming/ directories."""
-    raise NotImplementedError("TODO: implement")
+    """Create lake/batch/ and lake/streaming/ directories if they do not exist.
+
+    Returns the batch and streaming directory paths as a tuple.
+    """
+    batch_dir = LAKE_DIR / "batch"
+    streaming_dir = LAKE_DIR / "streaming"
+    batch_dir.mkdir(parents=True, exist_ok=True)
+    streaming_dir.mkdir(parents=True, exist_ok=True)
+    return batch_dir, streaming_dir
 
 
 def _clean_orders(rows: list[dict]) -> list[dict]:
-    """Shared cleaning logic for both batch and streaming paths.
+    """Drop invalid rows, add revenue = quantity * price, normalise status to lowercase/stripped.
 
-    1. Drop rows missing order_id, customer_id, or product_id
-    2. Keep only rows with quantity > 0 and price > 0
-    3. Add revenue = quantity * price
-    4. Normalise status to lowercase/stripped
+    Shared by both batch and streaming paths to guarantee identical cleaning logic.
     """
-    raise NotImplementedError("TODO: implement")
+    cleaned = []
+    for row in rows:
+        quantity = float(row.get("quantity", 0))
+        price = float(row.get("price", 0))
+        if not row.get("order_id") or not row.get("customer_id") or not row.get("product_id"):
+            continue
+        if quantity <= 0 or price <= 0:
+            continue
+        row["revenue"] = quantity * price
+        row["status"] = row.get("status", "").lower().strip()
+        cleaned.append(row)
+    return cleaned
 
 
 def _aggregate_by_category(rows: list[dict]) -> list[dict]:
-    """Aggregate cleaned rows by category -> total_revenue, order_count."""
-    raise NotImplementedError("TODO: implement")
+    """Return a list of {category, total_revenue, order_count} dicts, one per category."""
+    agg = defaultdict(lambda: {"total_revenue": 0.0, "order_count": 0})
+    for row in rows:
+        cat = row["category"]
+        agg[cat]["total_revenue"] += row["revenue"]
+        agg[cat]["order_count"] += 1
+    result = []
+    for cat, values in agg.items():
+        result.append({"category": cat, "total_revenue": values["total_revenue"], "order_count": values["order_count"]})
+    return result
 
 
 def _get_sample_events() -> list[dict]:
@@ -52,20 +76,18 @@ def _get_sample_events() -> list[dict]:
 # Architecture recommendation
 # ---------------------------------------------------------------------------
 
-def recommend_architecture(
-    latency_requirement: str,
-    budget: str,
-    data_volume: str,
-    reprocessing_needed: bool,
-) -> str:
-    """Recommend batch, kappa, or lambda based on requirements.
+def recommend_architecture(latency_requirement, budget, data_volume, reprocessing_needed) -> str:
+    """Return 'batch', 'kappa', or 'lambda' based on the four input requirements.
 
-    Decision logic:
-    1. hours latency OR low budget -> "batch"
-    2. no reprocessing AND not large data -> "kappa"
-    3. otherwise -> "lambda"
+    Rules: hours latency or low budget -> batch. No reprocessing and not large data -> kappa. Otherwise -> lambda.
+    Note: a single string output hides tensions between inputs -- see SCENARIOS.md for critique.
     """
-    raise NotImplementedError("TODO: implement")
+    if latency_requirement == "hours" or budget == "low":
+        return "batch"
+    elif reprocessing_needed == False and data_volume != "large":
+        return "kappa"
+    else:
+        return "lambda"
 
 
 # ---------------------------------------------------------------------------
@@ -73,28 +95,56 @@ def recommend_architecture(
 # ---------------------------------------------------------------------------
 
 def batch_orders() -> list[dict]:
-    """Batch path: read full CSV, clean, aggregate by category."""
-    raise NotImplementedError("TODO: implement")
+    """Read the full orders CSV, clean it, and return aggregated revenue and order count per category."""
+    with open(DATA_DIR / "orders.csv", newline="") as f:
+        rows = list(csv.DictReader(f))
+    cleaned = _clean_orders(rows)
+    return _aggregate_by_category(cleaned)
 
 
 def streaming_orders() -> list[dict]:
-    """Streaming simulation path: process file-based events, clean, aggregate."""
-    raise NotImplementedError("TODO: implement")
+    """Process simulated stream events (first 5 CSV rows), clean, and return aggregated revenue and order count per category."""
+    events = _get_sample_events()
+    cleaned = _clean_orders(events)
+    return _aggregate_by_category(cleaned)
 
 
 def serving_layer(batch: list[dict], streaming: list[dict]) -> list[dict]:
-    """Merge batch and streaming results; batch wins on duplicates."""
-    raise NotImplementedError("TODO: implement")
+    """Merge batch and streaming aggregates into one list sorted by category.
+
+    Batch is source of truth -- if a category appears in both, the batch numbers win.
+    This works because batch is iterated first, so streaming duplicates are skipped.
+    """
+    seen = set()
+    merged = []
+    for row in batch + streaming:
+        if row["category"] not in seen:
+            seen.add(row["category"])
+            merged.append(row)
+    return sorted(merged, key=lambda r: r["category"])
 
 
 def consistency_check(batch: list[dict], streaming: list[dict]) -> dict:
-    """Verify batch and streaming produce consistent results for shared data."""
-    raise NotImplementedError("TODO: implement")
+    """Compare batch and streaming category sets.
+
+    Returns overlapping_categories (count), batch_only (list), and stream_only (list).
+    """
+    batch_cats = {r["category"] for r in batch}
+    streaming_cats = {r["category"] for r in streaming}
+    return {
+        "overlapping_categories": len(batch_cats & streaming_cats),
+        "batch_only": sorted(batch_cats - streaming_cats),
+        "stream_only": sorted(streaming_cats - batch_cats),
+    }
 
 
 def write_results(results: list[dict], name: str) -> Path:
-    """Write aggregation results to lake/ as JSON."""
-    raise NotImplementedError("TODO: implement")
+    """Write results as JSON to LAKE_DIR/<name>.json and return the file path."""
+    path = LAKE_DIR / f"{name}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w") as f:
+        json.dump(results, f)
+    return path
 
 
 # ---------------------------------------------------------------------------
@@ -102,12 +152,9 @@ def write_results(results: list[dict], name: str) -> Path:
 # ---------------------------------------------------------------------------
 
 def run_pipeline() -> None:
-    """Execute the full pipeline and print each stage so you can see what changed.
+    """Execute the full pipeline and print each stage.
 
-    Provided as plumbing -- you do not need to edit this. As you implement the
-    tasks in order, re-run `uv run python -m standalone` and watch more stages
-    light up. Stages that depend on unimplemented tasks will raise
-    NotImplementedError; that is your cue for what to build next.
+    Re-run after implementing each task to see the next stage light up.
     """
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
